@@ -1,2 +1,0 @@
-# Saldo.
-Saldo
