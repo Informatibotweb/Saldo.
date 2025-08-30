@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Virtual Money App</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
+    body {
+        font-family: 'Poppins', sans-serif;
+        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+        color: white;
+        text-align: center;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        margin: 0;
+        padding: 20px;
+    }
+
+    .card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        width: 90%;
+        max-width: 400px;
+    }
+
+    h1 {
+        cursor: pointer;
+        font-size: 1.8em;
+        margin-bottom: 15px;
+    }
+
+    .saldo {
+        font-size: 2.5em;
+        font-weight: 600;
+        margin: 15px 0;
+        transition: all 0.5s ease;
+    }
+
+    button {
+        background: linear-gradient(135deg, #00c6ff, #0072ff);
+        border: none;
+        padding: 15px;
+        font-size: 1.1em;
+        border-radius: 12px;
+        cursor: pointer;
+        margin: 10px 0;
+        color: white;
+        font-weight: 600;
+        width: 100%;
+        transition: transform 0.2s ease;
+    }
+
+    button:hover {
+        transform: scale(1.05);
+    }
+
+    .popup {
+        background: rgba(255,255,255,0.08);
+        backdrop-filter: blur(8px);
+        padding: 20px;
+        border-radius: 12px;
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    input {
+        padding: 10px;
+        font-size: 1em;
+        border-radius: 8px;
+        border: none;
+        outline: none;
+        text-align: center;
+    }
+</style>
+</head>
+<body>
+
+<div class="card">
+    <h1 id="nome">Tap to set name</h1>
+    <div class="saldo" id="saldo">$ 15.99</div>
+    <button id="pagaBtn">PAGA</button>
+    <button id="impostaBtn">IMPOSTA SOMMA DA PAGARE</button>
+
+    <div class="popup" id="popup">
+        <input type="number" id="somma" placeholder="Amount to receive">
+        <button id="avviaNFC">AVVIA RICEZIONE NFC</button>
+    </div>
+</div>
+
+<script>
+    // ===================== Funzione animazione saldo =====================
+    function animaSaldo(inizio, fine, durata = 800) {
+        let start = performance.now();
+        const saldoEl = document.getElementById('saldo');
+
+        function step(timestamp) {
+            let progresso = (timestamp - start) / durata;
+            if (progresso > 1) progresso = 1;
+            let valore = inizio + (fine - inizio) * progresso;
+            saldoEl.textContent = "$ " + valore.toFixed(2);
+            if (progresso < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    }
+
+    // ===================== Inizializzazione =====================
+    let nome = localStorage.getItem('nome') || "Tap to set name";
+    let saldo = parseFloat(localStorage.getItem('saldo'));
+    let ultimoAggiornamento = parseInt(localStorage.getItem('ultimoAggiornamento'));
+
+    if (isNaN(saldo)) {
+        saldo = 15.99;
+        ultimoAggiornamento = Date.now();
+        localStorage.setItem('saldo', saldo);
+        localStorage.setItem('ultimoAggiornamento', ultimoAggiornamento);
+    }
+
+    // Aggiorna saldo in base ai minuti passati
+    let adesso = Date.now();
+    let minutiPassati = Math.floor((adesso - ultimoAggiornamento) / 60000);
+    if (minutiPassati > 0) {
+        let nuovoSaldo = saldo + minutiPassati * 1;
+        animaSaldo(saldo, nuovoSaldo);
+        saldo = nuovoSaldo;
+        ultimoAggiornamento = adesso;
+        localStorage.setItem('saldo', saldo);
+        localStorage.setItem('ultimoAggiornamento', ultimoAggiornamento);
+    } else {
+        document.getElementById('saldo').textContent = "$ " + saldo.toFixed(2);
+    }
+
+    document.getElementById('nome').textContent = nome;
+
+    // ===================== Cambio nome =====================
+    document.getElementById('nome').addEventListener('click', () => {
+        let nuovoNome = prompt("Enter your name:", nome);
+        if (nuovoNome) {
+            nome = nuovoNome;
+            localStorage.setItem('nome', nome);
+            document.getElementById('nome').textContent = nome;
+        }
+    });
+
+    // ===================== Aumento automatico ogni minuto =====================
+    setInterval(() => {
+        let nuovoSaldo = saldo + 1;
+        animaSaldo(saldo, nuovoSaldo);
+        saldo = nuovoSaldo;
+        ultimoAggiornamento = Date.now();
+        localStorage.setItem('saldo', saldo);
+        localStorage.setItem('ultimoAggiornamento', ultimoAggiornamento);
+    }, 60000);
+
+    // ===================== Popup somma =====================
+    document.getElementById('impostaBtn').addEventListener('click', () => {
+        document.getElementById('popup').style.display = "flex";
+    });
+
+    let sommaDaPagare = 0;
+
+    // ===================== NFC ricezione =====================
+    document.getElementById('avviaNFC').addEventListener('click', async () => {
+        sommaDaPagare = parseFloat(document.getElementById('somma').value) || 0;
+        document.getElementById('popup').style.display = "none";
+        try {
+            const reader = new NDEFReader();
+            await reader.scan();
+            reader.onreading = () => {
+                alert(`Somma inviata al pagante: $ ${sommaDaPagare.toFixed(2)}`);
+            };
+        } catch (err) {
+            alert("NFC non supportato o permesso negato.");
+        }
+    });
+
+    // ===================== NFC pagamento =====================
+    document.getElementById('pagaBtn').addEventListener('click', async () => {
+        try {
+            const writer = new NDEFWriter();
+            await writer.write(sommaDaPagare.toString());
+            let nuovoSaldo = saldo - sommaDaPagare;
+            if (nuovoSaldo < 0) nuovoSaldo = 0;
+            animaSaldo(saldo, nuovoSaldo);
+            saldo = nuovoSaldo;
+            ultimoAggiornamento = Date.now();
+            localStorage.setItem('saldo', saldo);
+            localStorage.setItem('ultimoAggiornamento', ultimoAggiornamento);
+            alert(`Hai pagato $ ${sommaDaPagare.toFixed(2)}`);
+        } catch (err) {
+            alert("NFC non supportato o permesso negato.");
+        }
+    });
+</script>
+
+</body>
+</html>
